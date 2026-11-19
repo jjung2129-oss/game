@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>남극 탈출 - DINO ESCAPE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --glass: rgba(255,255,255,0.16);
+    --glass-strong: rgba(255,255,255,0.24);
+    --line: rgba(255,255,255,0.38);
+    --ink: #0f1b3d;
+    --text: #ffffff;
+    --accent1: #5ee7ff;
+    --accent2: #8b5cf6;
+    --hot: #ff4d8d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #cfe2f7; font-family: "Noto Sans KR", "Malgun Gothic", sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; color: var(--text); }
+  canvas#gl { display: block; position: fixed; inset: 0; }
+
+  .glass {
+    background: var(--glass); border: 1px solid var(--line); border-radius: 18px;
+    backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 10px 30px rgba(20, 30, 80, 0.18), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #hud.hidden-play .play-only { display: none; }
+
+  #scoreCard { position: absolute; top: 16px; left: 16px; padding: 12px 18px 14px; min-width: 200px; }
+  #scoreCard .label { font-size: 11px; letter-spacing: 3px; opacity: .8; font-weight: 700; }
+  #score { font-family: "Black Han Sans", sans-serif; font-size: 40px; line-height: 1.05; background: linear-gradient(90deg, #fff, #d9f8ff); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 2px 12px rgba(94,231,255,.35); }
+  .chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .chip { font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: rgba(15,27,61,0.28); border: 1px solid rgba(255,255,255,.25); white-space: nowrap; }
+
+  #rightCol { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  #viewSwitch { display: flex; padding: 4px; gap: 4px; border-radius: 999px; pointer-events: auto; }
+  #viewSwitch button {
+    font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: transparent; border: none; cursor: pointer;
+    padding: 8px 14px; border-radius: 999px; transition: background .2s, color .2s, transform .1s; white-space: nowrap;
+  }
+  #viewSwitch button:hover { background: rgba(255,255,255,.18); }
+  #viewSwitch button.active { background: linear-gradient(135deg, var(--accent1), var(--accent2)); box-shadow: 0 4px 14px rgba(139,92,246,.45); }
+  #viewSwitch button:active { transform: scale(.95); }
+  #viewHint { font-size: 11px; opacity: .85; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  #minimapWrap { width: 150px; height: 150px; border-radius: 50%; padding: 5px; }
+  #minimap { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  #dinoCount { font-size: 13px; font-weight: 900; padding: 6px 12px; border-radius: 999px; }
+
+  #dashWrap { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); width: 220px; padding: 10px 14px; text-align: center; }
+  #dashLabel { font-size: 12px; font-weight: 900; letter-spacing: 1px; margin-bottom: 6px; }
+  #dashBar { height: 8px; border-radius: 99px; background: rgba(15,27,61,.3); overflow: hidden; }
+  #dashFill { height: 100%; width: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent1), var(--accent2)); transition: filter .2s; }
+  #dashFill.ready { filter: drop-shadow(0 0 6px var(--accent1)) brightness(1.15); }
+
+  #warn { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-family: "Black Han Sans", sans-serif; font-size: 30px; color: #fff; padding: 8px 22px; border-radius: 999px; background: linear-gradient(135deg, rgba(255,77,141,.85), rgba(255,122,69,.85)); box-shadow: 0 8px 30px rgba(255,77,141,.5); opacity: 0; transition: opacity .2s; white-space: nowrap; }
+  #warn.on { opacity: 1; animation: pulse .5s infinite alternate; }
+  @keyframes pulse { to { transform: translateX(-50%) scale(1.07); } }
+
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,40,90,0) 45%, rgba(255,40,90,.75) 100%); }
+  #floaters { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
+  .floater { position: absolute; transform: translate(-50%, -50%); font-family: "Black Han Sans", sans-serif; white-space: nowrap; text-shadow: 0 2px 0 rgba(255,255,255,.9), 0 0 14px rgba(255,255,255,.8); }
+
+  #dashBtn { position: absolute; right: 22px; bottom: 26px; width: 78px; height: 78px; border-radius: 50%; font: inherit; font-weight: 900; font-size: 15px; color: #fff; border: 1px solid var(--line); background: linear-gradient(135deg, rgba(94,231,255,.55), rgba(139,92,246,.55)); backdrop-filter: blur(10px); pointer-events: auto; display: none; }
+  @media (pointer: coarse) { #dashBtn { display: block; } }
+
+  .overlay .card { margin: auto; }
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; overflow-y: auto; padding: 16px; background: linear-gradient(160deg, rgba(40,60,140,.25), rgba(139,92,246,.25)); }
+  .overlay.hidden { display: none; }
+  .card { width: min(520px, 100%); padding: 30px 28px; text-align: center; border-radius: 28px; background: rgba(255,255,255,.18); }
+  .eyebrow { font-size: 12px; letter-spacing: 6px; font-weight: 900; opacity: .9; }
+  h1 { font-family: "Black Han Sans", sans-serif; font-weight: 400; font-size: clamp(46px, 11vw, 76px); line-height: 1; margin: 8px 0 6px;
+       background: linear-gradient(120deg, #ffffff 10%, #a5f3ff 45%, #c4b5fd 80%); -webkit-background-clip: text; background-clip: text; color: transparent;
+       filter: drop-shadow(0 6px 18px rgba(80,60,200,.35)); }
+  h2 { font-family: "Black Han Sans", sans-serif; font-weight: 400; font-size: clamp(30px, 7vw, 46px); background: linear-gradient(120deg, #fff, #ffc2d9); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-size: 15px; line-height: 1.7; opacity: .95; margin: 10px 0 18px; }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; text-align: left; }
+  .rule { font-size: 13px; padding: 10px 12px; border-radius: 14px; background: rgba(15,27,61,.22); border: 1px solid rgba(255,255,255,.2); line-height: 1.45; }
+  .rule b { display: block; font-size: 12px; opacity: .8; margin-bottom: 2px; }
+  kbd { font-family: inherit; font-size: 11px; font-weight: 900; padding: 1px 6px; border-radius: 6px; background: #fff; color: var(--ink); }
+  .cta { font: inherit; font-size: 18px; font-weight: 900; letter-spacing: 1px; color: #fff; border: none; cursor: pointer; padding: 14px 44px; border-radius: 999px;
+         background: linear-gradient(135deg, var(--accent1), var(--accent2) 60%, var(--hot)); background-size: 200% 200%; animation: shimmer 4s ease infinite;
+         box-shadow: 0 10px 28px rgba(139,92,246,.5); transition: transform .12s; }
+  .cta:hover { transform: translateY(-2px); }
+  .cta:active { transform: scale(.96); }
+  @keyframes shimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0 6px; }
+  .stat { padding: 10px 6px; border-radius: 14px; background: rgba(15,27,61,.22); border: 1px solid rgba(255,255,255,.2); }
+  .stat .v { font-family: "Black Han Sans", sans-serif; font-size: 24px; }
+  .stat .k { font-size: 11px; opacity: .8; font-weight: 700; }
+  #finalScore { font-family: "Black Han Sans", sans-serif; font-size: 54px; line-height: 1.1; margin-top: 6px; }
+  #newBest { display: inline-block; font-size: 12px; font-weight: 900; padding: 4px 12px; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #ff7a45); color: #3b1500; margin-top: 4px; }
+  .muted { font-size: 12px; opacity: .75; margin-top: 12px; }
+  .viewPick { font-size: 12px; opacity: .85; margin-top: 12px; }
+  .cta.revive { background: linear-gradient(135deg, #ff4d8d, #ff9a3c); box-shadow: 0 10px 28px rgba(255,77,141,.45); animation: none; }
+  .cta:disabled { opacity: .5; }
+  .shopRow { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 16px; }
+  .ghost { font: inherit; font-size: 13px; font-weight: 900; color: #fff; cursor: pointer; padding: 9px 18px; border-radius: 999px; background: rgba(15,27,61,.25); border: 1px solid rgba(255,255,255,.4); }
+  .link { font: inherit; font-size: 12px; color: #fff; opacity: .8; background: none; border: none; text-decoration: underline; cursor: pointer; }
+  /* 노치·홈바 영역 피하기 */
+  #scoreCard { top: calc(16px + env(safe-area-inset-top)); left: calc(16px + env(safe-area-inset-left)); }
+  #rightCol { top: calc(16px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right)); }
+  #dashWrap { bottom: calc(22px + env(safe-area-inset-bottom)); }
+  #dashBtn { bottom: calc(26px + env(safe-area-inset-bottom)); right: calc(22px + env(safe-area-inset-right)); }
+
+  @media (max-width: 600px) {
+    #scoreCard { padding: 8px 12px 10px; min-width: 0; }
+    #score { font-size: 28px; }
+    #minimapWrap { width: 104px; height: 104px; }
+    #viewSwitch button { padding: 6px 9px; font-size: 12px; }
+    #viewHint { display: none; }
+    #dashWrap { width: 170px; left: 16px; transform: none; }
+    .rules { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vignette"></div>
+<div id="floaters"></div>
+
+<div id="hud" class="hidden-play">
+  <div id="scoreCard" class="glass play-only">
+    <div class="label">SCORE</div>
+    <div id="score">0</div>
+    <div class="chips">
+      <span class="chip" id="cTime">⏱ 0.0s</span>
+      <span class="chip" id="cCrate">📦 0</span>
+      <span class="chip" id="cTrap">🕳 0</span>
+    </div>
+  </div>
+  <div id="rightCol">
+    <div id="viewSwitch" class="glass">
+      <button data-view="top">탑뷰</button>
+      <button data-view="quarter">쿼터뷰</button>
+      <button data-view="chase">3인칭</button>
+      <button data-view="fps">1인칭</button>
+    </div>
+    <div id="viewHint">V 키 또는 1·2·3·4 로 시점 전환</div>
+    <div id="minimapWrap" class="glass play-only"><canvas id="minimap" width="300" height="300"></canvas></div>
+    <div id="dinoCount" class="glass play-only">🦖 × 1</div>
+  </div>
+  <div id="warn">⚠ 뒤에 공룡!</div>
+  <div id="dashWrap" class="glass play-only">
+    <div id="dashLabel">DASH READY · SPACE</div>
+    <div id="dashBar"><div id="dashFill"></div></div>
+  </div>
+  <button id="dashBtn" class="play-only">DASH</button>
+</div>
+
+<div id="start" class="overlay">
+  <div class="card glass">
+    <div class="eyebrow">ANTARCTIC · DINO ESCAPE</div>
+    <h1>남극 탈출</h1>
+    <p class="sub">얼음 속에서 깨어난 공룡들이 기지를 덮쳤다.<br>미끄러운 빙판 위에서 최대한 오래 살아남아라.</p>
+    <div class="rules">
+      <div class="rule"><b>이동</b><kbd>WASD</kbd> <kbd>방향키</kbd><br>3인칭·1인칭: A·D 회전, W 전진</div>
+      <div class="rule"><b>대시</b><kbd>SPACE</kbd> 순간 가속<br>모바일: DASH 버튼</div>
+      <div class="rule"><b>보너스</b>공룡을 🕳 얼음 구멍으로 유인하면 풍덩!</div>
+      <div class="rule"><b>주의</b>당신도 구멍에 빠지면 끝. 📦 상자는 +150</div>
+    </div>
+    <button class="cta" id="startBtn">START</button>
+    <div class="viewPick">오른쪽 위에서 시점을 고를 수 있어요 · 게임 중에도 변경 가능</div>
+    <div class="shopRow">
+      <button class="ghost" id="removeAdsBtn">🚫 광고 제거</button>
+      <button class="link" id="restoreBtn">구매 복원</button>
+    </div>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="card glass">
+    <div class="eyebrow">GAME OVER</div>
+    <h2 id="reason">잡아먹혔다!</h2>
+    <div id="finalScore">0</div>
+    <div id="newBest" style="display:none">🏆 NEW BEST</div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="sTime">0s</div><div class="k">생존 시간</div></div>
+      <div class="stat"><div class="v" id="sCrate">0</div><div class="k">보급상자</div></div>
+      <div class="stat"><div class="v" id="sTrap">0</div><div class="k">빠뜨린 공룡</div></div>
+    </div>
+    <div class="muted" id="sBest">BEST 0</div>
+    <div style="height:16px"></div>
+    <button class="cta revive" id="reviveBtn">▶ 광고 보고 부활 (1회)</button>
+    <div style="height:10px"></div>
+    <button class="cta" id="retryBtn">RETRY</button>
+    <div class="muted">Enter 키로도 재시작</div>
+  </div>
+</div>
+
+<script type="module" src="/src/game.js"></script>
+</body>
+</html>
